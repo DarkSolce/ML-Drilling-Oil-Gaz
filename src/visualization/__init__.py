@@ -430,6 +430,8 @@ def create_drilling_report_template():
     </html>
     """
 
+from pathlib import Path  # Ajout de l'import manquant
+
 class PlotManager:
     """
     Gestionnaire centralisé pour tous les graphiques
@@ -612,9 +614,18 @@ def diagnose_visualization_setup():
     """
     import sys
     import matplotlib
+    import datetime  # Alternative si pandas n'est pas disponible
+
+    # Vérifier si pandas est disponible
+    try:
+        import pandas as pd
+        has_pandas = True
+    except ImportError:
+        has_pandas = False
     
+    # Créer le rapport avec gestion conditionnelle de pandas
     report = {
-        'timestamp': str(pd.Timestamp.now()) if 'pd' in globals() else 'N/A',
+        'timestamp': pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S') if has_pandas else datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'python_version': sys.version,
         'dependencies': check_plot_requirements(),
         'matplotlib_backend': matplotlib.get_backend(),

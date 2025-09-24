@@ -24,64 +24,50 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class DrillingDataLoader:
-    """
-    Classe principale pour le chargement des données de forage
-    """
-    
     def __init__(self, config: Optional[Dict] = None):
-        """
-        Initialise le data loader avec la configuration
-        
-        Args:
-            config: Dictionnaire de configuration
-        """
         self.config = config or {}
         self.data_path = Path(self.config.get('data_path', 'data/'))
         self.raw_path = self.data_path / 'raw'
         self.processed_path = self.data_path / 'processed'
         self.external_path = self.data_path / 'external'
-        
-        # Créer les dossiers s'ils n'existent pas
         for path in [self.raw_path, self.processed_path, self.external_path]:
             path.mkdir(parents=True, exist_ok=True)
-        
-        # Configuration des colonnes attendues
-        self.formation_columns = [
-            'Depth', 'FormationPressure', 'MudWeight', 'Temperature',
-            'Porosity', 'Permeability', 'RockType', 'WellboreAngle'
-        ]
-        
-        self.kick_columns = [
-            'Timestamp', 'FlowRateIn', 'FlowRateOut', 'StandpipePressure',
-            'CasingPressure', 'MudWeight', 'HookLoad', 'RPM', 'Torque',
-            'ROP', 'Kick'
-        ]
-        
-        logger.info(f"DataLoader initialisé avec data_path: {self.data_path}")
+    
+    def _basic_cleaning(self, df: pd.DataFrame) -> pd.DataFrame:
+        # Nettoyage simple (exemple)
+        return df.drop_duplicates()
     
     def load_formation_data(self, file_path: Optional[str] = None) -> pd.DataFrame:
         """
-        Charge les données de formation/pression
-        
-        Args:
-            file_path: Chemin vers le fichier (optionnel)
-            
-        Returns:
-            DataFrame avec les données de formation
+        Charge les données de formation/pression depuis un CSV
         """
         if file_path is None:
             file_path = self.raw_path / 'FormationChangeData.csv'
         
+        encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']
+        df = None
+        
+        for encoding in encodings:
+            try:
+                df = pd.read_csv(file_path, encoding=encoding)
+                logger.info(f"Fichier chargé avec encodage: {encoding}")
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if df is None:
+            raise ValueError("Impossible de décoder le fichier avec les encodages testés")
+        
+        # Nettoyage basique
+        df = self._basic_cleaning(df)
+        return df
+    
+    def load_from_api(self, api_url: str, params: Dict = None, headers: Dict = None) -> pd.DataFrame:
+        """
+        Charge des données depuis une API REST
+        """
         try:
-            # Détecter l'encodage du fichier
-            encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']
-            df = None
-            
-            for encoding in encodings:
-                try:
-                    df = pd.read_csv(file_path, encoding=encoding)
-                    logger.info(f"Chargement depuis API: {api_url}")
-            
+            logger.info(f"Appel API: {api_url}")
             response = requests.get(api_url, params=params, headers=headers, timeout=30)
             response.raise_for_status()
             
@@ -91,16 +77,13 @@ class DrillingDataLoader:
             if isinstance(data, list):
                 df = pd.DataFrame(data)
             elif isinstance(data, dict):
-                if 'data' in data:
-                    df = pd.DataFrame(data['data'])
-                else:
-                    df = pd.DataFrame([data])
+                df = pd.DataFrame(data.get('data', [data]))
             else:
                 raise ValueError("Format de données API non supporté")
             
             logger.info(f"Données chargées depuis API: {len(df)} lignes")
             return df
-            
+        
         except Exception as e:
             logger.error(f"Erreur lors du chargement depuis l'API: {e}")
             raise
@@ -217,7 +200,9 @@ class DrillingDataLoader:
                         batch = df_batch.iloc[i:i+batch_size]
                         callback_func(batch)
                 
-                #
+        except Exception as e:
+            logger.error(f"Erreur lors du streaming de données : {e}")
+            raise
     
     def load_multiple_files(self, file_pattern: str, 
                           data_type: str = 'auto') -> pd.DataFrame:
@@ -493,10 +478,10 @@ class DrillingDataLoader:
             Chemin du rapport généré
         """
         try:
-           import ProfileReport
+            from ydata_profiling import ProfileReport
             
             # Générer le profil
-            profile = ydata-profiling.ProfileReport(
+            profile = ProfileReport(
                 df, 
                 title="Drilling Data Profile Report",
                 explorative=True,
@@ -662,11 +647,9 @@ def validate_drilling_dataset(df: pd.DataFrame,
 if __name__ == "__main__":
     # Tests basiques
     loader = DrillingDataLoader()
-    
     print("🧪 Test de génération de données synthétiques...")
     synthetic_data = loader.load_synthetic_drilling_data(n_samples=1000)
     print(f"✅ Généré: {len(synthetic_data)} lignes")
-    
     print("\n📊 Résumé des données:")
     summary = loader.get_data_summary(synthetic_data)
     print(f"  • Shape: {summary['shape']}")
@@ -683,31 +666,7 @@ if __name__ == "__main__":
     saved_path = loader.save_processed_data(synthetic_data, "test_synthetic_data")
     print(f"✅ Sauvegardé: {saved_path}")
     
-    print("\n🎉 Tests terminés avec succès!")Fichier chargé avec encodage: {encoding}")
-                    break
-                except UnicodeDecodeError:
-                    continue
-            
-            if df is None:
-                raise ValueError("Impossible de décoder le fichier avec les encodages testés")
-            
-            logger.info(f"Données de formation chargées: {len(df)} lignes, {len(df.columns)} colonnes")
-            
-            # Validation des colonnes
-            missing_cols = [col for col in ['Depth', 'FormationPressure', 'MudWeight'] 
-                          if col not in df.columns]
-            if missing_cols:
-                logger.warning(f"Colonnes manquantes: {missing_cols}")
-            
-            # Nettoyage basique
-            df = self._basic_cleaning(df)
-            
-            return df
-            
-        except Exception as e:
-            logger.error(f"Erreur lors du chargement des données de formation: {e}")
-            raise
-    
+    print("\n🎉 Tests terminés avec succès!")  
     def load_kick_detection_data(self, file_path: Optional[str] = None) -> pd.DataFrame:
         """
         Charge les données de détection de kicks
@@ -913,36 +872,42 @@ if __name__ == "__main__":
         except Exception as e:
             logger.error(f"Erreur lors du chargement depuis la DB: {e}")
             raise
-    
-    def load_from_api(self, api_url: str, params: Dict = None, 
-                     headers: Dict = None) -> pd.DataFrame:
-        """
-        Charge des données depuis une API REST
+
+def load_from_api(self, api_url: str, params: Dict = None, headers: Dict = None) -> pd.DataFrame:
+    """
+    Charge des données depuis une API REST
+    """
+    try:
+        response = requests.get(api_url, params=params, headers=headers)
+        response.raise_for_status()  # Erreur si code HTTP != 200
         
-        Args:
-            api_url: URL de l'API
-            params: Paramètres de requête
-            headers: En-têtes HTTP
-            
-        Returns:
-            DataFrame avec les données
-        """
-        try:
-            logger.info(f", na=False).any():
-                try:
-                    df_clean[col] = pd.to_numeric(df_clean[col], errors='ignore')
-                except:
-                    pass
+        data = response.json()  # On suppose que l'API renvoie du JSON
+        df = pd.DataFrame(data)  # Créer le DataFrame
         
-        # Supprimer les duplicatas complets
+        # Nettoyage basique
+        df_clean = df.copy()
+        for col in df_clean.columns:
+            try:
+                df_clean[col] = pd.to_numeric(df_clean[col], errors='ignore')
+            except:
+                pass
+        
+        # Supprimer les duplicatas
         initial_rows = len(df_clean)
         df_clean = df_clean.drop_duplicates()
         removed_duplicates = initial_rows - len(df_clean)
-        
         if removed_duplicates > 0:
             logger.info(f"Supprimé {removed_duplicates} duplicatas")
         
         return df_clean
+    
+    except requests.RequestException as e:
+        logger.error(f"Erreur lors de l'appel API : {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Erreur lors du traitement des données API : {e}")
+        raise
+
     
     def _process_timestamp_column(self, df: pd.DataFrame, 
                                 col_name: str) -> pd.DataFrame:
@@ -1477,60 +1442,227 @@ if __name__ == "__main__":
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Profil des Données de Forage</title>
+            <title>Rapport d'Analyse - Données de Forage</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
             <style>
                 body {{
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    margin: 0;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    min-height: 100vh;
                     padding: 20px;
-                    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-                    color: #333;
                 }}
                 .container {{
-                    max-width: 1200px;
-                    margin: 0 auto;
                     background: white;
                     border-radius: 15px;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                    box-shadow: 0 15px 35px rgba(0,0,0,0.1);
                     overflow: hidden;
+                    margin-bottom: 20px;
                 }}
                 .header {{
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
                     color: white;
                     padding: 40px;
                     text-align: center;
                 }}
-                .header h1 {{
-                    margin: 0;
-                    font-size: 2.5em;
-                    font-weight: 300;
-                }}
-                .header p {{
-                    margin: 10px 0 0 0;
-                    font-size: 1.1em;
-                    opacity: 0.9;
-                }}
-                .section {{
-                    padding: 30px 40px;
-                    border-bottom: 1px solid #eee;
-                }}
-                .section:last-child {{
-                    border-bottom: none;
-                }}
-                .section h2 {{
-                    color: #667eea;
-                    margin-bottom: 20px;
-                    font-size: 1.8em;
-                    border-bottom: 2px solid #667eea;
-                    padding-bottom: 10px;
-                }}
-                .metric-grid {{
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                    gap: 20px;
+                .score-card {{
+                    font-size: 3em;
+                    font-weight: bold;
                     margin: 20px 0;
                 }}
+                .score-excellent {{ color: #28a745; }}
+                .score-good {{ color: #ffc107; }}
+                .score-poor {{ color: #dc3545; }}
+                .section {{
+                    padding: 30px;
+                    border-bottom: 1px solid #eee;
+                }}
+                .section:last-child {{ border-bottom: none; }}
                 .metric-card {{
                     background: #f8f9fa;
-                    padding: 20px;
                     border-radius: 10px;
+                    padding: 20px;
+                    margin: 10px 0;
+                    text-align: center;
+                    border-left: 4px solid #3498db;
+                }}
+                .metric-value {{
+                    font-size: 2em;
+                    font-weight: bold;
+                    color: #3498db;
+                }}
+                .alert ul {{
+                    margin-bottom: 0;
+                }}
+                table {{
+                    font-size: 0.9em;
+                }}
+                th {{
+                    background-color: #f8f9fa;
+                    position: sticky;
+                    top: 0;
+                }}
+                .table-scroll {{
+                    max-height: 400px;
+                    overflow-y: auto;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🛢️ Rapport d'Analyse - Données de Forage</h1>
+                    <p class="lead">Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}</p>
+                    
+                    <div class="score-card {score_class}">
+                        {score_emoji} {score}/100 - {score_text}
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>📊 Métriques Principales</h2>
+                    {metrics_html}
+                </div>
+
+                <div class="section">
+                    <h2>📋 Résumé des Données</h2>
+                    <div class="table-scroll">
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Colonne</th>
+                                    <th>Type</th>
+                                    <th>Valeurs Manquantes</th>
+                                    <th>Valeurs Uniques</th>
+                                    <th>Exemple</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {columns_table}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>🔍 Validation de la Qualité</h2>
+                    {validation_stats_html}
+                    {alerts_html}
+                </div>
+
+                {sample_html}
+                {correlations_html}
+
+                <div class="section text-center">
+                    <small class="text-muted">
+                        Rapport généré automatiquement par DrillingDataLoader • 
+                        {len(df):,} lignes × {len(df.columns)} colonnes • 
+                        Mémoire utilisée: {summary['basic_info']['memory_usage_mb']:.2f} MB
+                    </small>
+                </div>
+            </div>
+
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+        </body>
+        </html>
+        """
+        
+        return html_template
+
+    def clear_cache(self, key: Optional[str] = None):
+        """
+        Vide le cache des données
+        
+        Args:
+            key: Clé spécifique à vider (si None, vide tout le cache)
+        """
+        if key is None:
+            self._cache.clear()
+            logger.info("Cache complètement vidé")
+        elif key in self._cache:
+            del self._cache[key]
+            logger.info(f"Cache '{key}' vidé")
+        else:
+            logger.warning(f"Clé de cache non trouvée: {key}")
+
+    def get_cache_info(self) -> Dict[str, Any]:
+        """
+        Retourne des informations sur le cache
+        
+        Returns:
+            Informations sur l'état du cache
+        """
+        cache_info = {
+            'total_cached_items': len(self._cache),
+            'cached_keys': list(self._cache.keys()),
+            'cache_size_memory': 0,  # Pourrait être calculé avec sys.getsizeof()
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Estimer la taille mémoire (approximative)
+        total_size = 0
+        for key, value in self._cache.items():
+            if isinstance(value, pd.DataFrame):
+                total_size += value.memory_usage(deep=True).sum()
+            else:
+                total_size += len(str(value)) * 8  # Estimation grossière
+        
+        cache_info['estimated_size_mb'] = total_size / (1024 * 1024)
+        
+        return cache_info
+
+# Fonction utilitaire pour créer un chargeur de données avec configuration par défaut
+def create_default_loader(data_path: str = "data/") -> DrillingDataLoader:
+    """
+    Crée un chargeur de données avec une configuration par défaut
+    
+    Args:
+        data_path: Chemin vers le dossier des données
+        
+    Returns:
+        Instance de DrillingDataLoader configurée
+    """
+    config = {
+        'data_path': data_path,
+        'auto_create_dirs': True,
+        'default_encoding': 'utf-8',
+        'cache_enabled': True
+    }
+    
+    return DrillingDataLoader(config)
+
+# Exemple d'utilisation
+if __name__ == "__main__":
+    # Créer un chargeur avec le dossier de données par défaut
+    loader = create_default_loader()
+    
+    # Exemple: Charger des données de formation
+    try:
+        formation_data = loader.load_formation_data()
+        print(f"✅ Données de formation chargées: {formation_data.shape}")
+        
+        # Générer un résumé
+        summary = loader.get_data_summary(formation_data)
+        print(f"Résumé: {summary['basic_info']['shape']}")
+        
+        # Valider la qualité
+        validation = loader.validate_data_quality(formation_data, 'formation')
+        print(f"Score de qualité: {validation['overall_score']}/100")
+        
+        # Sauvegarder les données traitées
+        saved_path = loader.save_processed_data(formation_data, 'formation_processed')
+        print(f"Données sauvegardées: {saved_path}")
+        
+    except Exception as e:
+        print(f"❌ Erreur: {e}")
+    
+    # Exemple: Charger des données de kick
+    try:
+        kick_data = loader.load_kick_detection_data()
+        print(f"✅ Données de kick chargées: {kick_data.shape}")
+        
+        # Créer un profil détaillé
+        profile_path = loader.create_data_profile(kick_data)
+        print(f"Profil généré: {profile_path}")
+        
+    except Exception as e:
+        print(f"❌ Erreur avec les données de kick: {e}")

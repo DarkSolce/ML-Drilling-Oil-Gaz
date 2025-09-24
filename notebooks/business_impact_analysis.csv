@@ -1,0 +1,7 @@
+Model,Total_Cost,Cost_Per_Sample,Savings,Savings_Percentage,True_Positives,False_Positives,False_Negatives
+Logistic Regression,1950000,4875.0,18050000,90.25,19,0,1
+Support Vector,2920000,7300.0,17080000,85.39999999999999,18,2,2
+XGBoost,8610000,21525.0,11390000,56.95,12,1,8
+Gradient Boosting,9550000,23875.0,10450000,52.25,11,0,9
+Decision Tree,10510000,26275.0,9490000,47.449999999999996,10,1,10
+Random Forest,16200000,40500.0,3800000,19.0,4,0,16

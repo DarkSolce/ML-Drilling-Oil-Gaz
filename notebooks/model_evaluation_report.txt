@@ -1,0 +1,51 @@
+
+    ÉVALUATION COMPLÈTE DES MODÈLES ML - OPÉRATIONS DE FORAGE
+    =========================================================
+
+    DONNÉES ANALYSÉES:
+    • Formation Pressure: 2000 échantillons, 14 features
+    • Kick Detection: 2000 échantillons, 12 features
+    • Kicks synthétiques: 100.0 (5.0%)
+
+    MODÈLES ÉVALUÉS:
+    • Régression: 8 modèles testés
+    • Classification: 6 modèles testés
+    • Détection d'anomalies: 2 approches testées
+
+    PERFORMANCES TOP 3:
+
+    Formation Pressure (R² Score):
+                Model  Test_R2  Test_RMSE
+ Lasso Regression 0.946832 103.949481
+Linear Regression 0.946154 104.610361
+ Ridge Regression 0.946070 104.691505
+
+    Kick Detection (F1 Score):
+                  Model  Test_F1  Test_Precision  Test_Recall
+Logistic Regression 0.974359        1.000000         0.95
+     Support Vector 0.900000        0.900000         0.90
+            XGBoost 0.727273        0.923077         0.60
+
+    ROI Business (Top 3):
+                  Model  Savings_Percentage  False_Negatives
+Logistic Regression               90.25                1
+     Support Vector               85.40                2
+            XGBoost               56.95                8
+
+    MÉTRIQUES CRITIQUES:
+    • Précision formation pressure: ±104 psi RMSE
+    • Détection de kicks: 95.0% de rappel maximal
+    • Faux négatifs minimaux: 1 (sécurité critique)
+
+    RECOMMANDATIONS DE DÉPLOIEMENT:
+    1. Formation Pressure: Déployer Lasso Regression
+    2. Kick Detection: Déployer Logistic Regression (sécurité prioritaire)
+    3. Monitoring: Validation continue et retraining périodique
+    4. Seuils: Ajustables selon contexte opérationnel
+
+    PROCHAINES ÉTAPES:
+    • Validation sur données réelles de terrain
+    • Tests A/B en conditions contrôlées
+    • Intégration avec systèmes SCADA existants
+    • Formation des équipes opérationnelles
+    

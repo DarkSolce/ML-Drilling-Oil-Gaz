@@ -1,0 +1,16 @@
+Feature
+MRFlow
+ActiveGL_MA3
+ActiveGL_MA5
+ActiveGL_Change
+ActiveGL_ChangeRate
+FIn_x_ActiveGL
+FIn_div_ActiveGL
+FOut_x_ActiveGL
+FOut_div_ActiveGL
+ActiveGL_x_WBoPress
+ActiveGL_div_WBoPress
+ActiveGL_x_MRFlow
+ActiveGL_div_MRFlow
+ActiveGL_squared
+ActiveGL_sqrt

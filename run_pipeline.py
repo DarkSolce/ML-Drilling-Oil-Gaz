@@ -118,6 +118,82 @@ class MLDrillingPipeline:
         
         try:
             # Get enhanced data
+            enhanced_data = data['formation']['enhanced']
+            
+            # Split features and target
+            X = enhanced_data.drop('FPress', axis=1, errors='ignore')
+            y = enhanced_data['FPress'] if 'FPress' in enhanced_data.columns else None
+            
+            if y is None:
+                raise ValueError("Formation pressure target (FPress) not found in data")
+            
+            logger.info(f"Training data shape: X={X.shape}, y={y.shape}")
+            
+            # Models to train
+            models_to_train = {
+                'PCR': PCRFormationPressure(n_components=4),
+                'XGBoost': XGBoostFormationPressure(),
+                'Ensemble': EnsembleFormationPressure(['pcr', 'xgboost'])
+            }
+            
+            # Train each model
+            for name, model in models_to_train.items():
+                logger.info(f"Training {name} model...")
+                
+                try:
+                    # Train model
+                    metrics = model.train(X, y, validation_split=0.2)
+                    
+                    # Save model
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    model_path = config.get_model_path(f"formation_pressure_{name.lower()}_{timestamp}.pkl")
+                    saved_path = model.save_model(str(model_path))
+                    
+                    # Store results
+                    results[name] = {
+                        'model': model,
+                        'metrics': metrics,
+                        'saved_path': saved_path,
+                        'training_completed': datetime.now().isoformat()
+                    }
+                    
+                    logger.info(f"{name} model training completed. Val R²: {metrics['val_r2']:.4f}")
+                    
+                except Exception as e:
+                    logger.error(f"Error training {name} model: {str(e)}")
+                    results[name] = {'error': str(e)}
+            
+            # Model comparison
+            if len(results) > 1:
+                try:
+                    # Prepare test data
+                    X_test = X.tail(100)
+                    y_test = y.tail(100)
+                    
+                    # Compare models
+                    trained_models = {name: res['model'] for name, res in results.items() if 'model' in res}
+                    comparison = FormationPressureAnalyzer.compare_models(trained_models, X_test, y_test)
+                    
+                    results['comparison'] = comparison.to_dict('records')
+                    logger.info("Model comparison completed")
+                    
+                except Exception as e:
+                    logger.warning(f"Model comparison failed: {str(e)}")
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error in formation pressure model training: {str(e)}")
+            return {'error': str(e)}
+    
+    def train_kick_detection_models(self, data: dict) -> dict:
+        """Train kick detection models"""
+        logger.info("Training kick detection models...")
+        
+        results = {}
+        
+        try:
+            # Get enhanced data
             enhanced_data = data['kick']['enhanced']
             
             # Prepare features (exclude target columns)
@@ -595,77 +671,3 @@ Examples:
 
 if __name__ == "__main__":
     main()
-            # Get enhanced data
-enhanced_data = data['formation']['enhanced']
-            
-            # Split features and target
-X = enhanced_data.drop('FPress', axis=1, errors='ignore')
-y = enhanced_data['FPress'] if 'FPress' in enhanced_data.columns else None
-            
-if y is None:
-                raise ValueError("Formation pressure target (FPress) not found in data")
-            
-logger.info(f"Training data shape: X={X.shape}, y={y.shape}")
-            
-            # Models to train
-models_to_train = {
-                'PCR': PCRFormationPressure(n_components=4),
-                'XGBoost': XGBoostFormationPressure(),
-                'Ensemble': EnsembleFormationPressure(['pcr', 'xgboost'])
-            }
-            
-            # Train each model
-for name, model in models_to_train.items():
-                logger.info(f"Training {name} model...")
-                
-                try:
-                    # Train model
-                    metrics = model.train(X, y, validation_split=0.2)
-                    
-                    # Save model
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    model_path = config.get_model_path(f"formation_pressure_{name.lower()}_{timestamp}.pkl")
-                    saved_path = model.save_model(str(model_path))
-                    
-                    # Store results
-                    results[name] = {
-                        'model': model,
-                        'metrics': metrics,
-                        'saved_path': saved_path,
-                        'training_completed': datetime.now().isoformat()
-                    }
-                    
-                    logger.info(f"{name} model training completed. Val R²: {metrics['val_r2']:.4f}")
-                    
-                except Exception as e:
-                    logger.error(f"Error training {name} model: {str(e)}")
-                    results[name] = {'error': str(e)}
-            
-            # Model comparison
-if len(results) > 1:
-                try:
-                    # Prepare test data
-                    X_test = X.tail(100)
-                    y_test = y.tail(100)
-                    
-                    # Compare models
-                    trained_models = {name: res['model'] for name, res in results.items() if 'model' in res}
-                    comparison = FormationPressureAnalyzer.compare_models(trained_models, X_test, y_test)
-                    
-                    results['comparison'] = comparison.to_dict('records')
-                    logger.info("Model comparison completed")
-                    
-                except Exception as e:
-                    logger.warning(f"Model comparison failed: {str(e)}")
-            
-            return results
-            
-        except Exception as e:
-            logger.error(f"Error in formation pressure model training: {str(e)}")
-            return {'error': str(e)}
-    
-    def train_kick_detection_models(self, data: dict) -> dict:
-        """Train kick detection models"""
-        logger.info("Training kick detection models...")
-        
-        results = {}

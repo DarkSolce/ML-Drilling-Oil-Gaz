@@ -511,13 +511,14 @@ class DrillingFeatureEngineer:
         
         return df_enhanced
     
+    from typing import Dict, Any
     def get_feature_engineering_summary(self) -> Dict[str, Any]:
         """Get summary of feature engineering process"""
         return {
-            'feature_groups_created': len(self.feature_history),
-            'feature_history': self.feature_history,
-            'physics_features_enabled': self.drilling_physics_enabled
-        }
+        'feature_groups_created': len(self.feature_history),
+        'feature_history': self.feature_history,
+        'physics_features_enabled': self.drilling_physics_enabled
+    }
 
 # Utility functions for specific drilling calculations
 def calculate_mse(wob: np.ndarray, rop: np.ndarray, torque: np.ndarray, 
