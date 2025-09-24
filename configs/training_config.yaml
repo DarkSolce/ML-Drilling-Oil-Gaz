@@ -1,0 +1,561 @@
+# Configuration d'entraînement pour les modèles ML de forage
+# ========================================================
+
+# Configuration de l'expérience
+experiment:
+  name: "drilling_ml_experiment"
+  description: "Expérience ML pour la prédiction et détection en forage pétrolier"
+  version: "1.0.0"
+  tags: ["drilling", "oil_gas", "formation_pressure", "kick_detection"]
+  
+  # Métadonnées
+  author: "ML Engineering Team"
+  created_date: "2024-01-01"
+  
+  # Reproductibilité
+  random_seed: 42
+  deterministic: true
+
+# Configuration des données d'entraînement
+training_data:
+  # Sources de données
+  formation_pressure:
+    file_path: "data/raw/FormationChangeData.csv"
+    target_column: "FormationPressure"
+    feature_columns: 
+      - "Depth"
+      - "MudWeight" 
+      - "Temperature"
+      - "Porosity"
+      - "Permeability"
+    
+    # Préprocessing spécifique
+    preprocessing:
+      remove_outliers: true
+      outlier_method: "iqr"
+      outlier_threshold: 2.0
+      
+      feature_scaling: true
+      scaling_method: "robust"
+      
+      feature_engineering:
+        polynomial_features: false
+        interaction_features: true
+        log_transform: ["Depth", "Permeability"]
+  
+  kick_detection:
+    file_path: "data/raw/Kick_Detection_Data2.csv"
+    target_column: "Kick"
+    feature_columns:
+      - "FlowRateIn"
+      - "FlowRateOut"
+      - "StandpipePressure"
+      - "CasingPressure"
+      - "MudWeight"
+      - "HookLoad"
+      - "RPM"
+      - "Torque"
+      - "ROP"
+    
+    # Préprocessing spécifique
+    preprocessing:
+      handle_class_imbalance: true
+      imbalance_method: "smote"  # smote, adasyn, random_oversample, random_undersample
+      
+      remove_outliers: true
+      outlier_method: "isolation_forest"
+      outlier_threshold: 0.1
+      
+      feature_scaling: true
+      scaling_method: "standard"
+      
+      feature_engineering:
+        create_ratios: true
+        create_differences: true
+        rolling_features: true
+        rolling_windows: [3, 5, 10]
+
+# Configuration des modèles d'entraînement
+models:
+  formation_pressure:
+    # Modèles à entraîner
+    model_list:
+      - "random_forest"
+      - "gradient_boosting" 
+      - "xgboost"
+      - "svr"
+      - "neural_network"
+    
+    # Configuration d'entraînement par modèle
+    random_forest:
+      hyperparameter_search:
+        method: "random_search"
+        n_iterations: 50
+        param_distributions:
+          n_estimators: [50, 100, 200, 300, 500]
+          max_depth: [5, 10, 15, 20, null]
+          min_samples_split: [2, 5, 10, 15]
+          min_samples_leaf: [1, 2, 4, 6]
+          max_features: ["sqrt", "log2", null]
+          bootstrap: [true, false]
+      
+      early_stopping:
+        enabled: false
+      
+      feature_importance:
+        calculate: true
+        method: "permutation"
+    
+    gradient_boosting:
+      hyperparameter_search:
+        method: "bayesian"
+        n_iterations: 30
+        param_distributions:
+          n_estimators: [50, 100, 200]
+          learning_rate: [0.01, 0.05, 0.1, 0.15, 0.2]
+          max_depth: [3, 5, 7, 9]
+          subsample: [0.8, 0.9, 1.0]
+          min_samples_split: [2, 5, 10]
+          min_samples_leaf: [1, 2, 4]
+      
+      early_stopping:
+        enabled: true
+        patience: 10
+        min_delta: 0.001
+    
+    xgboost:
+      hyperparameter_search:
+        method: "random_search"
+        n_iterations: 40
+        param_distributions:
+          n_estimators: [100, 200, 300, 500]
+          learning_rate: [0.01, 0.05, 0.1, 0.2]
+          max_depth: [3, 5, 7, 9]
+          subsample: [0.8, 0.9, 1.0]
+          colsample_bytree: [0.8, 0.9, 1.0]
+          reg_alpha: [0, 0.1, 0.5, 1.0]
+          reg_lambda: [0, 0.1, 0.5, 1.0]
+      
+      early_stopping:
+        enabled: true
+        patience: 15
+    
+    neural_network:
+      hyperparameter_search:
+        method: "grid_search"
+        param_grid:
+          hidden_layer_sizes: 
+            - [50]
+            - [100]
+            - [100, 50]
+            - [200, 100]
+            - [100, 100, 50]
+          activation: ["relu", "tanh"]
+          alpha: [0.0001, 0.001, 0.01]
+          learning_rate_init: [0.001, 0.01, 0.1]
+      
+      early_stopping:
+        enabled: true
+        patience: 20
+        validation_fraction: 0.15
+  
+  kick_detection:
+    # Modèles à entraîner
+    model_list:
+      - "random_forest"
+      - "gradient_boosting"
+      - "xgboost"
+      - "svm"
+      - "logistic_regression"
+      - "neural_network"
+    
+    # Configuration d'entraînement par modèle
+    random_forest:
+      hyperparameter_search:
+        method: "random_search"
+        n_iterations: 60
+        param_distributions:
+          n_estimators: [100, 200, 300, 500]
+          max_depth: [5, 10, 15, 20, null]
+          min_samples_split: [2, 5, 10]
+          min_samples_leaf: [1, 2, 4]
+          class_weight: ["balanced", "balanced_subsample", null]
+          max_features: ["sqrt", "log2", null]
+      
+      class_weight_optimization:
+        enabled: true
+        method: "balanced"
+    
+    gradient_boosting:
+      hyperparameter_search:
+        method: "bayesian"
+        n_iterations: 40
+        param_distributions:
+          n_estimators: [50, 100, 200, 300]
+          learning_rate: [0.01, 0.05, 0.1, 0.2]
+          max_depth: [3, 5, 7]
+          subsample: [0.8, 0.9, 1.0]
+          min_samples_split: [2, 5, 10]
+      
+      early_stopping:
+        enabled: true
+        patience: 15
+    
+    xgboost:
+      hyperparameter_search:
+        method: "random_search"
+        n_iterations: 50
+        param_distributions:
+          n_estimators: [100, 200, 300, 500]
+          learning_rate: [0.01, 0.05, 0.1, 0.2]
+          max_depth: [3, 5, 7, 9]
+          subsample: [0.8, 0.9, 1.0]
+          colsample_bytree: [0.8, 0.9, 1.0]
+          scale_pos_weight: [1, 2, 3, 5, 10]
+      
+      early_stopping:
+        enabled: true
+        patience: 20
+    
+    svm:
+      hyperparameter_search:
+        method: "grid_search"
+        param_grid:
+          C: [0.1, 1, 10, 100, 1000]
+          gamma: ["scale", "auto", 0.001, 0.01, 0.1, 1]
+          kernel: ["rbf", "poly", "sigmoid"]
+          class_weight: ["balanced", null]
+      
+      probability_calibration:
+        enabled: true
+        method: "sigmoid"
+    
+    logistic_regression:
+      hyperparameter_search:
+        method: "grid_search"
+        param_grid:
+          C: [0.01, 0.1, 1, 10, 100]
+          penalty: ["l1", "l2"]
+          solver: ["liblinear", "saga"]
+          class_weight: ["balanced", null]
+      
+      regularization_path:
+        enabled: true
+        n_alphas: 20
+    
+    neural_network:
+      hyperparameter_search:
+        method: "random_search"
+        n_iterations: 30
+        param_distributions:
+          hidden_layer_sizes:
+            - [50]
+            - [100]
+            - [100, 50]
+            - [200, 100]
+            - [100, 100, 50]
+            - [200, 100, 50]
+          activation: ["relu", "tanh", "logistic"]
+          alpha: [0.0001, 0.001, 0.01, 0.1]
+          learning_rate_init: [0.001, 0.01, 0.1]
+          solver: ["adam", "lbfgs"]
+      
+      early_stopping:
+        enabled: true
+        patience: 25
+        validation_fraction: 0.15
+
+# Configuration de la validation
+validation:
+  # Stratégie de validation
+  strategy: "time_series_split"  # kfold, stratified_kfold, time_series_split, holdout
+  
+  # Paramètres de validation croisée
+  cross_validation:
+    n_splits: 5
+    shuffle: true
+    random_state: 42
+    
+  # Validation temporelle (si applicable)
+  time_series_validation:
+    n_splits: 5
+    test_size_ratio: 0.2
+    gap: 0  # Nombre d'échantillons à ignorer entre train et test
+  
+  # Métriques de validation
+  metrics:
+    formation_pressure:
+      primary: "r2"
+      secondary: ["mse", "rmse", "mae", "mape"]
+      custom: ["drilling_efficiency_score"]
+    
+    kick_detection:
+      primary: "f1"
+      secondary: ["accuracy", "precision", "recall", "auc", "precision_recall_auc"]
+      custom: ["detection_rate", "false_alarm_rate"]
+  
+  # Seuils de validation
+  performance_thresholds:
+    formation_pressure:
+      r2_min: 0.80
+      rmse_max: 500  # psi
+      mape_max: 15   # %
+    
+    kick_detection:
+      f1_min: 0.85
+      accuracy_min: 0.90
+      precision_min: 0.80
+      recall_min: 0.85
+
+# Configuration de l'entraînement
+training:
+  # Parallélisation
+  parallel:
+    enabled: true
+    n_jobs: -1  # Utiliser tous les cores
+    backend: "threading"  # threading, multiprocessing
+  
+  # Gestion mémoire
+  memory:
+    batch_processing: false
+    batch_size: 1000
+    memory_limit_gb: 8
+  
+  # Checkpointing
+  checkpointing:
+    enabled: true
+    frequency: "epoch"  # epoch, iteration, time
+    save_best_only: true
+    monitor_metric: "val_loss"
+    checkpoint_dir: "outputs/checkpoints/"
+  
+  # Arrêt précoce global
+  early_stopping:
+    enabled: true
+    patience: 20
+    min_delta: 0.001
+    restore_best_weights: true
+  
+  # Timeout
+  timeout:
+    enabled: true
+    max_time_hours: 6
+    per_model_time_hours: 2
+
+# Configuration de l'ensemble learning
+ensemble:
+  # Méthodes d'ensemble
+  methods:
+    voting:
+      enabled: true
+      type: "soft"  # hard, soft
+      weights: null  # Auto ou liste de poids
+    
+    stacking:
+      enabled: true
+      cross_validation_folds: 5
+      meta_models:
+        formation_pressure: "LinearRegression"
+        kick_detection: "LogisticRegression"
+    
+    blending:
+      enabled: false
+      holdout_ratio: 0.2
+    
+    bagging:
+      enabled: false
+      n_estimators: 5
+      bootstrap: true
+  
+  # Sélection des modèles pour l'ensemble
+  model_selection:
+    method: "top_k"  # top_k, threshold, all
+    k: 3  # Pour top_k
+    threshold: 0.95  # Pour threshold (performance relative au meilleur)
+  
+  # Optimisation des poids
+  weight_optimization:
+    enabled: true
+    method: "scipy_minimize"  # scipy_minimize, grid_search
+    bounds: [0, 1]
+
+# Configuration du feature engineering automatique
+automated_feature_engineering:
+  enabled: true
+  
+  # Sélection de features
+  feature_selection:
+    methods: ["mutual_info", "f_regression", "rfe"]
+    n_features_to_select: "auto"  # auto, int, float (ratio)
+    
+  # Création de features
+  feature_creation:
+    polynomial_features:
+      enabled: false
+      degree: 2
+      interaction_only: true
+      
+    ratio_features:
+      enabled: true
+      combinations: "auto"  # auto ou liste de tuples
+      
+    time_based_features:
+      enabled: true
+      lag_periods: [1, 2, 3, 5]
+      rolling_windows: [3, 5, 10, 20]
+      
+    domain_specific:
+      enabled: true
+      drilling_efficiency_features: true
+      pressure_gradient_features: true
+      anomaly_detection_features: true
+
+# Configuration du monitoring d'entraînement
+training_monitoring:
+  # Logging détaillé
+  verbose_logging: true
+  log_frequency: "epoch"
+  
+  # Métriques à suivre
+  tracked_metrics:
+    - "loss"
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1"
+    - "auc"
+    - "training_time"
+    - "memory_usage"
+  
+  # Visualisations en temps réel
+  real_time_plots:
+    enabled: false  # Nécessite environnement interactif
+    update_frequency: 10  # epochs
+  
+  # Alertes d'entraînement
+  alerts:
+    performance_plateau:
+      enabled: true
+      patience: 15
+      threshold: 0.001
+    
+    divergence_detection:
+      enabled: true
+      threshold: 1.5  # Ratio val_loss/train_loss
+    
+    memory_usage:
+      enabled: true
+      threshold_gb: 12
+
+# Configuration de l'optimisation automatique
+automl:
+  enabled: false
+  
+  # Budget d'optimisation
+  optimization_budget:
+    max_trials: 100
+    max_time_hours: 12
+    max_resources_per_trial: 1
+  
+  # Espace de recherche
+  search_space:
+    models: ["random_forest", "gradient_boosting", "xgboost"]
+    preprocessing: ["standard", "robust", "minmax"]
+    feature_selection: [0.5, 0.7, 0.9, 1.0]
+  
+  # Algorithme d'optimisation
+  optimizer:
+    algorithm: "tpe"  # tpe, random, grid, hyperband
+    acquisition_function: "ei"  # ei, pi, ucb
+
+# Configuration de l'évaluation finale
+final_evaluation:
+  # Test set évaluation
+  holdout_evaluation:
+    enabled: true
+    test_size: 0.15
+    stratified: true
+  
+  # Bootstrap évaluation
+  bootstrap_evaluation:
+    enabled: true
+    n_bootstraps: 1000
+    confidence_level: 0.95
+  
+  # Analyse de stabilité
+  stability_analysis:
+    enabled: true
+    n_runs: 5
+    different_seeds: true
+  
+  # Tests statistiques
+  statistical_tests:
+    enabled: true
+    significance_level: 0.05
+    tests: ["wilcoxon", "mcnemar", "paired_ttest"]
+
+# Configuration de la sauvegarde
+model_saving:
+  # Formats de sauvegarde
+  formats: ["joblib", "pickle"]
+  
+  # Compression
+  compression:
+    enabled: true
+    method: "gzip"  # gzip, bz2, lzma
+  
+  # Métadonnées
+  save_metadata: true
+  metadata_format: "json"
+  
+  # Versioning
+  versioning:
+    enabled: true
+    version_format: "timestamp"  # timestamp, semantic, sequential
+  
+  # Artifacts à sauvegarder
+  artifacts:
+    model: true
+    preprocessor: true
+    feature_selector: true
+    scaler: true
+    training_history: true
+    validation_results: true
+    feature_importance: true
+
+# Configuration du reporting
+reporting:
+  # Génération automatique de rapports
+  auto_generate: true
+  
+  # Format des rapports
+  formats: ["html", "pdf", "markdown"]
+  
+  # Contenu du rapport
+  include_sections:
+    executive_summary: true
+    data_analysis: true
+    model_comparison: true
+    performance_metrics: true
+    feature_importance: true
+    validation_results: true
+    recommendations: true
+  
+  # Visualisations
+  include_plots:
+    training_curves: true
+    confusion_matrix: true
+    roc_curves: true
+    feature_importance: true
+    residual_plots: true
+    calibration_plots: true
+  
+  # Distribution du rapport
+  distribution:
+    email:
+      enabled: false
+      recipients: []
+    
+    storage:
+      local_path: "outputs/reports/"
+      cloud_storage: false
