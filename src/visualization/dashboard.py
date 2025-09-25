@@ -899,7 +899,7 @@ class DrillingDashboard:
         # Auto-refresh logic
         if simulate_realtime and auto_refresh:
             time.sleep(1)  # Small delay
-            st.rerun()
+            st.experimental_rerun()
     
     def render_model_performance_page(self):
         """Render model performance comparison page"""
