@@ -209,7 +209,7 @@ class DrillingDashboard:
         # Data refresh
         if st.sidebar.button("🔄 Refresh Data"):
             self.clear_cache()
-            st.rerun()
+            st.experimental_rerun()
         
         # Model controls
         st.sidebar.markdown("### Model Controls")
